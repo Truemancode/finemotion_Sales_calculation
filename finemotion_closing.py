@@ -42,7 +42,8 @@ if st.button('Start'):
     frame = driver.find_element_by_xpath("/html/frameset/frame")
     driver.switch_to.frame(frame)
 
-    driver.find_element_by_xpath("/html/body/div/div[1]/form[1]/a[1]").click()
+    #タスク表をクリック
+    driver.find_element_by_xpath("/html/body/div/div[4]/a[1]").click()
 
     driver.switch_to.default_content()
     frame = driver.find_element_by_xpath("/html/frameset/frameset/frame[2]")
