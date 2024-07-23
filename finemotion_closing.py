@@ -51,11 +51,10 @@ if st.button('Start'):
     driver.switch_to.frame(frame)
 
     #池袋ファインをクリック
-    driver.find_element_by_xpath("/html/body/div[2]/table/tbody/tr/td[13]/form/input[7]").click()
+    driver.find_element_by_xpath("/html/body/div[2]/table/tbody/tr/td[11]/form/input[7]").click()
 
     driver.find_element_by_xpath("/html/body/div[2]/table/tbody/tr/td[3]/form/input[6]").click()
 
-    time.sleep(2)
     namber = driver.find_element_by_xpath("/html/body/div[3]/table[1]/tbody/tr[1]/td/table/tbody/tr/td[1]")
     namber = namber.text
 
