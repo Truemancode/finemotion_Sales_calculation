@@ -9,6 +9,7 @@ from helium import start_chrome, go_to, kill_browser, set_driver
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 import re
+import time
 
 total_expense = 0
 st.title("Sales calculation")
@@ -54,6 +55,7 @@ if st.button('Start'):
 
     driver.find_element_by_xpath("/html/body/div[2]/table/tbody/tr/td[3]/form/input[6]").click()
 
+    time.sleep(3)
     namber = driver.find_element_by_xpath("/html/body/div[3]/table[1]/tbody/tr[1]/td/table/tbody/tr/td[1]")
     namber = namber.text
 
