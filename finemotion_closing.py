@@ -1,16 +1,58 @@
 import streamlit as st
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from helium import *
 import requests
 import os
 import sys
 import importlib
 from helium import start_chrome, go_to, kill_browser, set_driver
-from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 import re
 import time
 
+def generate_webdriver():
+    driver = None
+    try:
+        # "HEROKU"環境変数が設定されている場合、Heroku環境とみなす
+        if os.environ.get("HEROKU"):
+            # Heroku環境の場合
+            options = Options()
+            options.binary_location = os.environ.get("GOOGLE_CHROME_BIN")
+            options.add_argument("--headless")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-software-rasterizer")
+            options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
+            options.add_argument('window-size=1920x1080')
+            driver = webdriver.Chrome(options=options, executable_path=os.environ.get("CHROMEDRIVER_PATH"))
+        else:
+            # Heroku環境でない場合（ローカル環境）
+            driver_path = ChromeDriverManager().install()
+            options = Options()
+            #options.add_argument('--headless')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
+            options.add_argument('window-size=1920x1080')
+            driver = webdriver.Chrome(options=options, executable_path=driver_path)
+
+    except Exception as e:
+        # エラーが出た場合、webdriver_managerで再度ダウンロードを試みる
+        print(f"Error occurred: {e}. Trying to download chromedriver using webdriver_manager...")
+        driver_path = ChromeDriverManager().install()
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument('--disable-gpu')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
+        options.add_argument('window-size=1920x1080')
+        driver = webdriver.Chrome(executable_path=driver_path, options=options)
+
+    set_driver(driver)
+    return driver
+
+# ここから元の処理
 total_expense = 0
 st.title("Sales calculation")
 st.write("MIND+の情報を元に計算します。\nお客様の会計が済んでいるものを「済」に変更してあるか、\nまた給与を渡した女性のキャスト報酬が締められているか確認をしてください。")
@@ -25,15 +67,9 @@ total_expense = sum(int(expense) for expense in expenses_list if expense.isdigit
 st.write(f"経費合計{total_expense}円")
 
 if st.button('Start'):
-    driver_path = ChromeDriverManager().install()
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
-    driver = webdriver.Chrome(executable_path=driver_path, options=options)
+    driver = generate_webdriver()  # ここでgenerate_webdriver()を呼ぶ
 
-    # Helium の機能を利用するために、セットアップします
-    set_driver(driver)
     driver.set_window_size(1800,2000)
-
     go_to("https://mp-system.info/shadymotionAdmin/PcAdmin/auth/login/")
 
     driver.find_element_by_xpath("/html/body/div[2]/form/table/tbody/tr[2]/td/table/tbody/tr[1]/td[2]/input").send_keys("mutou")
@@ -62,7 +98,6 @@ if st.button('Start'):
     match = re.search(r'(\d+)\s*件目', namber)
     if match:
         result = match.group(1)
-        # st.write(result)
     else:
         st.write("No match found.")
 
@@ -73,9 +108,7 @@ if st.button('Start'):
     sales = 0
     subject_0 = 0
     for x in range(3, int(result), 2):
-        # print(x)
         elem_0 = driver.find_element_by_xpath(f"/html/body/div[3]/table[1]/tbody/tr[2]/td/table/tbody/tr[{x}]/td[12]/div/a").text
-        
         if elem_0 == "済":
             elem_1 = driver.find_element_by_xpath(f"/html/body/div[3]/table[1]/tbody/tr[2]/td/table/tbody/tr[{x}]/td[10]").text
             elem_1 = elem_1.replace(",", "").replace("円", "")
@@ -88,7 +121,6 @@ if st.button('Start'):
                 continue
             sales += int(elem_1)
 
-        # print(elem_0)
     st.write(f"会計済み:{subject_0}件")
     st.write(f"カード売り上げ:{cord}円")
     st.write(f"現金売り上げ:{sales}円")
@@ -118,7 +150,6 @@ if st.button('Start'):
         number = match.group(1)
         number = int(number)
         number += 1
-        # st.write(f"{number}") # Output: 111
     else:
         st.write("No match found.")
 
@@ -132,23 +163,15 @@ if st.button('Start'):
         try:
             salary += int(elem_3)
             subject_1 += 1
-        except ValueError: # handle the exception
-            salary += 0 # if not a number, add 0 instead
+        except ValueError:
+            salary += 0
 
     st.write(f"給与件数{subject_1}")
     st.write(f"女子給{salary}")
 
-    # Final_total = total_sales - cord
-    # Final_total = Final_total - salary
-    # Final_total = Final_total - int(starting_money)
-    # Final_total = Final_total - int(total_expense)
-    # st.write(f"レジ金含まない、カード含まない:{Final_total}円")
-    # Final_total_cash_register = Final_total + int(starting_money)
-    # st.write(f"レジ金含む、カード含まない:{Final_total_cash_register}円")
-
     st.write("現金売上からカード、女子給料、経費を引いた額")
     Final_total_1 = total_sales - cord
-    Final_total_1 = Final_total_1 -salary
+    Final_total_1 = Final_total_1 - salary
     Final_total_1 = Final_total_1 - int(total_expense)
     st.write(f"{Final_total_1}円\n")
 
@@ -160,4 +183,3 @@ if st.button('Start'):
     st.write(f"{Final_total_2}円\n")
 
     driver.quit()
-
