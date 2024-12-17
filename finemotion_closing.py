@@ -10,10 +10,29 @@ from webdriver_manager.chrome import ChromeDriverManager
 import re
 import time
 
-# WebDriverWaitとECを使用するためのインポート
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
+from requests.structures import CaseInsensitiveDict
+
+cluster_develop = "DKdCyzHD66MkVLAykESKl6oKRaiGkjapLqJsiNV4fw8"
+
+def send_line_notify_with_image(message, image_path, token):
+    print(f"send_line_notify_with_image called with message={message}, image_path={image_path}")
+    url = 'https://notify-api.line.me/api/notify'
+    headers = CaseInsensitiveDict({
+        'Authorization': f'Bearer {token}'
+    })
+
+    with open(image_path, 'rb') as image_file:
+        files = {
+            'imageFile': image_file,
+            'message': (None, message)
+        }
+        response = requests.post(url, headers=headers, files=files)
+    print("LINE通知レスポンス:", response.status_code, response.text)
+    return response.status_code
 
 def generate_webdriver():
     print("=== generate_webdriver START ===")
@@ -110,6 +129,10 @@ def generate_webdriver():
 
     set_driver(driver)
     print("=== generate_webdriver END ===")
+
+    # 起動直後のスクショ送信
+    driver.save_screenshot('screenshot_driver_started.png')
+    send_line_notify_with_image("WebDriver起動直後の状態です。", "screenshot_driver_started.png", cluster_develop)
     return driver
 
 total_expense = 0
@@ -130,49 +153,92 @@ if st.button('Start'):
     print("=== Startボタン押下: 処理開始 ===")
     driver = generate_webdriver()  # ドライバ生成（デバッグ多数）
 
-    print("go_to開始")
+    print("画面遷移開始: ログインページへ")
     driver.set_window_size(1800,2000)
     go_to("https://mp-system.info/shadymotionAdmin/PcAdmin/auth/login/")
+    driver.save_screenshot('screenshot_after_goto_login.png')
+    send_line_notify_with_image("ログインページ表示確認", "screenshot_after_goto_login.png", cluster_develop)
     print("go_to完了")
 
     print("ログイン処理開始")
-    driver.find_element_by_xpath("/html/body/div[2]/form/table/tbody/tr[2]/td/table/tbody/tr[1]/td[2]/input").send_keys("mutou")
-    driver.find_element_by_xpath("/html/body/div[2]/form/table/tbody/tr[2]/td/table/tbody/tr[2]/td[2]/input").send_keys("mutou")
-    driver.find_element_by_xpath("/html/body/div[2]/form/table/tbody/tr[4]/td/input").click()
-    print("ログイン処理完了")
+    try:
+        driver.find_element_by_xpath("/html/body/div[2]/form/table/tbody/tr[2]/td/table/tbody/tr[1]/td[2]/input").send_keys("mutou")
+        driver.find_element_by_xpath("/html/body/div[2]/form/table/tbody/tr[2]/td/table/tbody/tr[2]/td[2]/input").send_keys("mutou")
+        driver.find_element_by_xpath("/html/body/div[2]/form/table/tbody/tr[4]/td/input").click()
+        print("ログイン処理完了")
+    except Exception as e:
+        print("ログイン処理でエラー:", e)
+        driver.save_screenshot('screenshot_login_error.png')
+        send_line_notify_with_image("ログイン処理中にエラー発生", "screenshot_login_error.png", cluster_develop)
+        driver.quit()
+        sys.exit(1)
 
-    frame = driver.find_element_by_xpath("/html/frameset/frame")
-    driver.switch_to.frame(frame)
+    print("フレーム切り替え中")
+    try:
+        frame = driver.find_element_by_xpath("/html/frameset/frame")
+        driver.switch_to.frame(frame)
+        print("フレーム切り替え成功")
+    except Exception as e:
+        print("フレーム切り替えでエラー:", e)
+        driver.save_screenshot('screenshot_frame_error.png')
+        send_line_notify_with_image("フレーム切り替えエラー発生", "screenshot_frame_error.png", cluster_develop)
+        driver.quit()
+        sys.exit(1)
 
     #タスク表をクリック
     print("タスク表クリック")
-    driver.find_element_by_xpath("/html/body/div/div[4]/a[1]").click()
+    try:
+        driver.find_element_by_xpath("/html/body/div/div[4]/a[1]").click()
+        print("タスク表クリック成功")
+    except Exception as e:
+        print("タスク表クリックでエラー:", e)
+        driver.save_screenshot('screenshot_task_error.png')
+        send_line_notify_with_image("タスク表クリックエラー", "screenshot_task_error.png", cluster_develop)
+        driver.quit()
+        sys.exit(1)
 
     driver.switch_to.default_content()
     frame = driver.find_element_by_xpath("/html/frameset/frameset/frame[2]")
     driver.switch_to.frame(frame)
 
     print("池袋ファインクリック")
-    driver.find_element_by_xpath("/html/body/div[2]/table/tbody/tr/td[11]/form/input[7]").click()
-    driver.find_element_by_xpath("/html/body/div[2]/table/tbody/tr/td[3]/form/input[6]").click()
+    try:
+        driver.find_element_by_xpath("/html/body/div[2]/table/tbody/tr/td[11]/form/input[7]").click()
+        driver.find_element_by_xpath("/html/body/div[2]/table/tbody/tr/td[3]/form/input[6]").click()
+        print("池袋ファインクリック成功")
+    except Exception as e:
+        print("池袋ファインクリックでエラー:", e)
+        driver.save_screenshot('screenshot_fine_click_error.png')
+        send_line_notify_with_image("池袋ファインクリックエラー", "screenshot_fine_click_error.png", cluster_develop)
+        driver.quit()
+        sys.exit(1)
 
     time.sleep(3)
-    print("件数取得（20秒間待機して該当要素を取得）")
+    print("件数取得（最大20秒待機）")
+    driver.save_screenshot('screenshot_before_wait_namber.png')
+    send_line_notify_with_image("件数取得前のページ状況", "screenshot_before_wait_namber.png", cluster_develop)
 
-    # ここで20秒間対象要素が表示されるまで待機
-    namber_element = WebDriverWait(driver, 20).until(
-        EC.presence_of_element_located((By.XPATH, "/html/body/div[3]/table[1]/tbody/tr[1]/td/table/tbody/tr/td[1]"))
-    )
-    namber = namber_element.text
-    print("取得したテキスト:", namber)
+    try:
+        namber_element = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.XPATH, "/html/body/div[3]/table[1]/tbody/tr[1]/td/table/tbody/tr/td[1]"))
+        )
+        namber = namber_element.text
+        print("取得したテキスト:", namber)
+    except Exception as e:
+        print("件数取得でタイムアウト/エラー:", e)
+        driver.save_screenshot('screenshot_namber_timeout.png')
+        send_line_notify_with_image("件数取得タイムアウト/エラー発生", "screenshot_namber_timeout.png", cluster_develop)
+        driver.quit()
+        sys.exit(1)
 
     match = re.search(r'(\d+)\s*件目', namber)
     if match:
         result = match.group(1)
         print("ヒットした件数:", result)
     else:
-        st.write("No match found.")
         print("No match found for 件数")
+        driver.save_screenshot('screenshot_namber_nomatch.png')
+        send_line_notify_with_image("件数が取得できませんでした", "screenshot_namber_nomatch.png", cluster_develop)
         driver.quit()
         sys.exit(1)
 
@@ -183,6 +249,9 @@ if st.button('Start'):
     sales = 0
     subject_0 = 0
     print("売上集計開始")
+    driver.save_screenshot('screenshot_before_sales_check.png')
+    send_line_notify_with_image("売上集計前状態", "screenshot_before_sales_check.png", cluster_develop)
+
     for x in range(3, int(result), 2):
         elem_0 = driver.find_element_by_xpath(f"/html/body/div[3]/table[1]/tbody/tr[2]/td/table/tbody/tr[{x}]/td[12]/div/a").text
         if elem_0 == "済":
@@ -197,11 +266,8 @@ if st.button('Start'):
                 continue
             sales += int(elem_1)
 
-    st.write(f"会計済み:{subject_0}件")
-    st.write(f"カード売り上げ:{cord}円")
-    st.write(f"現金売り上げ:{sales}円")
+    print("売上集計完了。会計済み:", subject_0, "件, カード売:", cord, "現金売:", sales)
     total_sales =  cord + sales
-    st.write(f"総売り上げ:{total_sales}円")
 
     print("給与情報取得開始")
     driver.switch_to.default_content()
@@ -226,14 +292,18 @@ if st.button('Start'):
         number = int(number)
         number += 1
     else:
-        st.write("No match found.")
         print("No match found for 給与件数")
+        driver.save_screenshot('screenshot_salary_nomatch.png')
+        send_line_notify_with_image("給与件数が取得できませんでした", "screenshot_salary_nomatch.png", cluster_develop)
         driver.quit()
         sys.exit(1)
 
     salary = 0
     subject_1 = 0
     print("給与集計開始")
+    driver.save_screenshot('screenshot_before_salary_calc.png')
+    send_line_notify_with_image("給与集計前状態", "screenshot_before_salary_calc.png", cluster_develop)
+
     for y in range(1,number):
         elem_3 = driver.find_element_by_xpath(f"/html/body/div[3]/table/tbody/tr[4]/td/div/table/tbody/tr[{y}]/td[7]")
         elem_3 = elem_3.text
@@ -244,6 +314,14 @@ if st.button('Start'):
             subject_1 += 1
         except ValueError:
             salary += 0
+
+    print("給与集計完了。給与件数:", subject_1, "女子給:", salary)
+
+    # 結果表示
+    st.write(f"会計済み:{subject_0}件")
+    st.write(f"カード売り上げ:{cord}円")
+    st.write(f"現金売り上げ:{sales}円")
+    st.write(f"総売り上げ:{total_sales}円")
 
     st.write(f"給与件数{subject_1}")
     st.write(f"女子給{salary}")
@@ -256,6 +334,9 @@ if st.button('Start'):
     Final_total_2 = int(starting_money) + total_sales - cord - salary - int(total_expense)
     st.write(f"{Final_total_2}円\n")
 
-    print("処理終了。ブラウザを終了します。")
+    print("処理終了。ブラウザを終了します。最終結果をスクショします。")
+    driver.save_screenshot('screenshot_final.png')
+    send_line_notify_with_image("処理完了。最終結果です。", "screenshot_final.png", cluster_develop)
+
     driver.quit()
     print("=== 全処理完了 ===")
