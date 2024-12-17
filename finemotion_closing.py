@@ -1,23 +1,25 @@
 import streamlit as st
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from helium import *
+from helium import set_driver, go_to
 import requests
 import os
 import sys
 import importlib
-from helium import set_driver, go_to
 from webdriver_manager.chrome import ChromeDriverManager
 import re
 import time
-import stat  # パーミッション変更用
+
+# WebDriverWaitとECを使用するためのインポート
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 def generate_webdriver():
     print("=== generate_webdriver START ===")
     driver = None
     try:
         if os.environ.get("HEROKU"):
-            # Heroku環境
             print("HEROKU環境検出。CHROMEDRIVER_PATHとGOOGLE_CHROME_BINを使用します。")
             print("GOOGLE_CHROME_BIN:", os.environ.get("GOOGLE_CHROME_BIN"))
             print("CHROMEDRIVER_PATH:", os.environ.get("CHROMEDRIVER_PATH"))
@@ -31,7 +33,6 @@ def generate_webdriver():
             options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
             options.add_argument('window-size=1920x1080')
 
-            # CHROMEDRIVER_PATHに実行権限を付与
             chromedriver_path = os.environ.get("CHROMEDRIVER_PATH")
             print("CHROMEDRIVER_PATHへのchmod実行")
             os.chmod(chromedriver_path, 0o755)
@@ -39,7 +40,6 @@ def generate_webdriver():
             driver = webdriver.Chrome(options=options, executable_path=chromedriver_path)
             print("Heroku環境でのwebdriver起動成功")
         else:
-            # ローカル環境
             print("ローカル環境検出。webdriver_managerでchromedriverを取得します。")
             driver_path = ChromeDriverManager().install()
             print("ChromeDriverManagerが返したパス:", driver_path)
@@ -62,12 +62,10 @@ def generate_webdriver():
                 raise FileNotFoundError("chromedriver実行ファイルが見つかりません。")
 
             print("使用するchromedriverバイナリ:", chrome_binary)
-            # 実行権限付与
-            print("ローカル用chromedriverにchmodを付与します。")
             os.chmod(chrome_binary, 0o755)
 
             options = Options()
-            #options.add_argument('--headless')  # 必要なら有効化
+            #options.add_argument('--headless')  # 必要であればコメント解除
             options.add_argument('--disable-gpu')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
@@ -97,7 +95,6 @@ def generate_webdriver():
             print("再取得後もchromedriver実行ファイルが見つかりません。")
             raise FileNotFoundError("chromedriver実行ファイルが見つかりません。")
 
-        # 実行権限付与
         print("再取得したchromedriverにもchmodを付与します。")
         os.chmod(chrome_binary, 0o755)
 
@@ -115,7 +112,6 @@ def generate_webdriver():
     print("=== generate_webdriver END ===")
     return driver
 
-# 以下、元の処理にprintを追加しつつ維持
 total_expense = 0
 st.title("Sales calculation")
 st.write("MIND+の情報を元に計算します。\nお客様の会計が済んでいるものを「済」に変更してあるか、\nまた給与を渡した女性のキャスト報酬が締められているか確認をしてください。")
@@ -161,9 +157,13 @@ if st.button('Start'):
     driver.find_element_by_xpath("/html/body/div[2]/table/tbody/tr/td[3]/form/input[6]").click()
 
     time.sleep(3)
-    print("件数取得")
-    namber = driver.find_element_by_xpath("/html/body/div[3]/table[1]/tbody/tr[1]/td/table/tbody/tr/td[1]")
-    namber = namber.text
+    print("件数取得（20秒間待機して該当要素を取得）")
+
+    # ここで20秒間対象要素が表示されるまで待機
+    namber_element = WebDriverWait(driver, 20).until(
+        EC.presence_of_element_located((By.XPATH, "/html/body/div[3]/table[1]/tbody/tr[1]/td/table/tbody/tr/td[1]"))
+    )
+    namber = namber_element.text
     print("取得したテキスト:", namber)
 
     match = re.search(r'(\d+)\s*件目', namber)
