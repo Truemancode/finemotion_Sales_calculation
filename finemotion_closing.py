@@ -6,10 +6,11 @@ import requests
 import os
 import sys
 import importlib
-from helium import start_chrome, go_to, kill_browser, set_driver
+from helium import set_driver, go_to
 from webdriver_manager.chrome import ChromeDriverManager
 import re
 import time
+import stat  # パーミッション変更用
 
 def generate_webdriver():
     print("=== generate_webdriver START ===")
@@ -29,9 +30,13 @@ def generate_webdriver():
             options.add_argument("--disable-software-rasterizer")
             options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
             options.add_argument('window-size=1920x1080')
-            
-            # Heroku上ではビルドパックで設定された実行ファイルを利用
-            driver = webdriver.Chrome(options=options, executable_path=os.environ.get("CHROMEDRIVER_PATH"))
+
+            # CHROMEDRIVER_PATHに実行権限を付与
+            chromedriver_path = os.environ.get("CHROMEDRIVER_PATH")
+            print("CHROMEDRIVER_PATHへのchmod実行")
+            os.chmod(chromedriver_path, 0o755)
+
+            driver = webdriver.Chrome(options=options, executable_path=chromedriver_path)
             print("Heroku環境でのwebdriver起動成功")
         else:
             # ローカル環境
@@ -44,25 +49,25 @@ def generate_webdriver():
             dir_contents = os.listdir(driver_dir)
             print("driver_dir 内のファイル:", dir_contents)
 
-            # もしTHIRD_PARTY_NOTICES.chromedriverしかなければ、同ディレクトリに実行ファイルがあるか探す
             chrome_binary = None
-            # 一般的には "chromedriver" という名前の実行ファイルが存在するはず
             for f in dir_contents:
                 if f == "chromedriver":
                     chrome_binary = os.path.join(driver_dir, f)
                     break
 
             if chrome_binary is None:
-                # 万が一chromedriverファイルが見つからない場合、エラー出力
                 print("chromedriver実行ファイルが見つかりません。")
                 print("取得したディレクトリ:", driver_dir)
                 print("ファイル一覧:", dir_contents)
                 raise FileNotFoundError("chromedriver実行ファイルが見つかりません。")
 
             print("使用するchromedriverバイナリ:", chrome_binary)
+            # 実行権限付与
+            print("ローカル用chromedriverにchmodを付与します。")
+            os.chmod(chrome_binary, 0o755)
 
             options = Options()
-            #options.add_argument('--headless')  # 必要に応じて有効化
+            #options.add_argument('--headless')  # 必要なら有効化
             options.add_argument('--disable-gpu')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
@@ -72,7 +77,6 @@ def generate_webdriver():
             print("ローカル環境でのwebdriver起動成功")
 
     except Exception as e:
-        # エラー時に再トライ（ヘッドレス、webdriver_manager再インストール）
         print(f"Error occurred in generate_webdriver: {e}")
         print("webdriver_managerで再度chromedriver取得を試みます...")
         driver_path = ChromeDriverManager().install()
@@ -93,6 +97,10 @@ def generate_webdriver():
             print("再取得後もchromedriver実行ファイルが見つかりません。")
             raise FileNotFoundError("chromedriver実行ファイルが見つかりません。")
 
+        # 実行権限付与
+        print("再取得したchromedriverにもchmodを付与します。")
+        os.chmod(chrome_binary, 0o755)
+
         options = Options()
         options.add_argument("--headless")
         options.add_argument('--disable-gpu')
@@ -107,7 +115,7 @@ def generate_webdriver():
     print("=== generate_webdriver END ===")
     return driver
 
-# ここから元の処理
+# 以下、元の処理にprintを追加しつつ維持
 total_expense = 0
 st.title("Sales calculation")
 st.write("MIND+の情報を元に計算します。\nお客様の会計が済んでいるものを「済」に変更してあるか、\nまた給与を渡した女性のキャスト報酬が締められているか確認をしてください。")
@@ -126,7 +134,6 @@ if st.button('Start'):
     print("=== Startボタン押下: 処理開始 ===")
     driver = generate_webdriver()  # ドライバ生成（デバッグ多数）
 
-    # デバッグ用
     print("go_to開始")
     driver.set_window_size(1800,2000)
     go_to("https://mp-system.info/shadymotionAdmin/PcAdmin/auth/login/")
