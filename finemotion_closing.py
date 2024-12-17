@@ -51,7 +51,7 @@ if st.button('Start'):
     driver.switch_to.frame(frame)
 
     #池袋ファインをクリック
-    driver.find_element_by_xpath("/html/body/div[2]/table/tbody/tr/td[13]/form/input[7]").click()
+    driver.find_element_by_xpath("/html/body/div[2]/table/tbody/tr/td[11]/form/input[7]").click()
 
     driver.find_element_by_xpath("/html/body/div[2]/table/tbody/tr/td[3]/form/input[6]").click()
 
